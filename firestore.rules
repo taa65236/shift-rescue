@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // パイロットテスト用の設定です。
+    // 誰でも jobs コレクションを読み書きできるようにしています（認証なし）。
+    // 一般公開・長期運用する場合は、投稿頻度の制限や簡易認証の追加を検討してください。
+    match /jobs/{jobId} {
+      allow read, write: if true;
+    }
+  }
+}
