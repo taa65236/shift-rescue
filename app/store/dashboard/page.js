@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Button from "@/components/Button";
@@ -8,6 +9,10 @@ import { useApp } from "@/context/AppContext";
 
 export default function StoreDashboardPage() {
   const { jobs, loading } = useApp();
+  const [showMatched, setShowMatched] = useState(false);
+
+  const openJobs = jobs.filter((job) => job.status !== "matched");
+  const matchedJobs = jobs.filter((job) => job.status === "matched");
 
   return (
     <main className="min-h-screen bg-slate-50 pb-16">
@@ -33,13 +38,13 @@ export default function StoreDashboardPage() {
             <div className="rounded-2xl border border-dashed border-ink-900/15 bg-white p-10 text-center text-sm text-ink-700/60">
               読み込み中です…
             </div>
-          ) : jobs.length === 0 ? (
+          ) : openJobs.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-ink-900/15 bg-white p-10 text-center text-sm text-ink-700/60">
               現在募集中の欠員はありません。「欠員を募集する」から新しい募集を作成してください。
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {jobs.map((job) => (
+              {openJobs.map((job) => (
                 <JobCard
                   key={job.id}
                   job={job}
@@ -47,12 +52,10 @@ export default function StoreDashboardPage() {
                     <Button
                       as={Link}
                       href={`/store/applicants/${job.id}`}
-                      variant={job.status === "matched" ? "outline" : "secondary"}
+                      variant="secondary"
                       className="w-full"
                     >
-                      {job.status === "matched"
-                        ? "応募者一覧を見る"
-                        : `応募者を見る（${(job.applicants || []).length}人）`}
+                      応募者を見る（{(job.applicants || []).length}人）
                     </Button>
                   }
                 />
@@ -60,6 +63,39 @@ export default function StoreDashboardPage() {
             </div>
           )}
         </div>
+
+        {matchedJobs.length > 0 && (
+          <div className="mt-10 border-t border-ink-900/10 pt-6">
+            <button
+              onClick={() => setShowMatched((prev) => !prev)}
+              className="flex items-center gap-2 text-sm font-semibold text-ink-700/70 hover:text-ink-900"
+            >
+              <span>{showMatched ? "▾" : "▸"}</span>
+              成立済みの募集を表示（{matchedJobs.length}件）
+            </button>
+
+            {showMatched && (
+              <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
+                {matchedJobs.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    footer={
+                      <Button
+                        as={Link}
+                        href={`/store/applicants/${job.id}`}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        採用した人の連絡先を見る
+                      </Button>
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );
