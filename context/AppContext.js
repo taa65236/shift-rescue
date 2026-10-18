@@ -1,8 +1,10 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { auth } from "@/lib/firebase";
 import {
   listJobs,
+  listApplicants,
   createJob,
   applyToJobRemote,
   matchJobRemote,
@@ -15,6 +17,8 @@ const POLL_INTERVAL_MS = 4000;
 
 export function AppProvider({ children }) {
   const [jobs, setJobs] = useState([]);
+  // 自分が出した募集ごとの応募者一覧 { [jobId]: [応募者, ...] }
+  const [applicantsByJob, setApplicantsByJob] = useState({});
   const [loading, setLoading] = useState(true);
   const pollingRef = useRef(null);
 
@@ -22,6 +26,32 @@ export function AppProvider({ children }) {
     try {
       const latest = await listJobs();
       setJobs(latest);
+
+      // 応募者は「自分（店舗）が出した募集」の分だけ取りに行く。
+      // 他の店舗の応募者は、ルール上も読めないようにする（ステップ6）。
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        setApplicantsByJob((prev) => (Object.keys(prev).length ? {} : prev));
+      } else {
+        const myJobs = latest.filter((job) => job.ownerId === uid);
+        const entries = await Promise.all(
+          myJobs.map(async (job) => {
+            try {
+              return [job.id, await listApplicants(job.id)];
+            } catch (error) {
+              console.error("応募者の取得に失敗しました:", error);
+              return [job.id, null];
+            }
+          })
+        );
+        setApplicantsByJob((prev) => {
+          const next = {};
+          for (const [jobId, list] of entries) {
+            next[jobId] = list ?? prev[jobId] ?? [];
+          }
+          return next;
+        });
+      }
     } catch (error) {
       console.error("募集一覧の取得に失敗しました:", error);
     } finally {
@@ -35,16 +65,20 @@ export function AppProvider({ children }) {
     return () => clearInterval(pollingRef.current);
   }, []);
 
-  // 欠員募集を新規作成する
+  // 欠員募集を新規作成する（作った人のuidを ownerId として保存）
   const addJob = async (jobData) => {
-    const jobId = await createJob(jobData);
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error("ログインしてください。");
+    const jobId = await createJob({ ...jobData, ownerId: uid });
     await refreshJobs();
     return jobId;
   };
 
   // ワーカーが募集に応募する（名前・連絡先・一言メッセージを登録）
   const applyToJob = async (jobId, applicantInfo) => {
-    await applyToJobRemote(jobId, applicantInfo);
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error("ログインしてください。");
+    await applyToJobRemote(jobId, uid, applicantInfo);
     await refreshJobs();
   };
 
@@ -54,19 +88,36 @@ export function AppProvider({ children }) {
     await refreshJobs();
   };
 
-  const getJob = (jobId) => jobs.find((job) => job.id === jobId);
+  // 募集に「応募人数（applicantCount）」を付けた一覧。
+  // 数えられるのは自分が出した募集だけ（他店の応募者は読めないため）。
+  const jobsWithCount = useMemo(
+    () =>
+      jobs.map((job) =>
+        applicantsByJob[job.id]
+          ? { ...job, applicantCount: applicantsByJob[job.id].length }
+          : job
+      ),
+    [jobs, applicantsByJob]
+  );
+
+  const getJob = (jobId) => jobsWithCount.find((job) => job.id === jobId);
 
   const getApplicantsForJob = (jobId) => {
-    const job = jobs.find((j) => j.id === jobId);
-    if (!job) return [];
-    return [...(job.applicants || [])].sort(
-      (a, b) => new Date(a.appliedAt) - new Date(b.appliedAt)
-    );
+    const list = applicantsByJob[jobId] || [];
+    return [...list].sort((a, b) => new Date(a.appliedAt) - new Date(b.appliedAt));
   };
 
   const value = useMemo(
-    () => ({ jobs, loading, addJob, applyToJob, matchJob, getJob, getApplicantsForJob }),
-    [jobs, loading]
+    () => ({
+      jobs: jobsWithCount,
+      loading,
+      addJob,
+      applyToJob,
+      matchJob,
+      getJob,
+      getApplicantsForJob,
+    }),
+    [jobsWithCount, applicantsByJob, loading]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

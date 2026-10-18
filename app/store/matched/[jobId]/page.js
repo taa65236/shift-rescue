@@ -7,11 +7,11 @@ import { useApp } from "@/context/AppContext";
 
 export default function StoreMatchedPage({ params }) {
   const { jobId } = params;
-  const { getJob } = useApp();
+  const { getJob, getApplicantsForJob } = useApp();
 
   const job = getJob(jobId);
   const matchedApplicant = job
-    ? (job.applicants || []).find((a) => a.id === job.matchedApplicantId)
+    ? getApplicantsForJob(jobId).find((a) => a.id === job.matchedApplicantId)
     : null;
 
   return (

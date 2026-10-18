@@ -5,7 +5,8 @@ import { formatRelativeTime } from "@/lib/time";
 
 export default function JobCard({ job, footer }) {
   const isMatched = job.status === "matched";
-  const applicantCount = (job.applicants || []).length;
+  // 応募人数は、自分が出した募集だけ数えられる（他店の募集では 0 のまま）
+  const applicantCount = job.applicantCount || 0;
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-ink-900/10 bg-white p-5 shadow-card">

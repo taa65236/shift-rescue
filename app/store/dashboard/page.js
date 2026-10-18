@@ -55,7 +55,7 @@ export default function StoreDashboardPage() {
                       variant="secondary"
                       className="w-full"
                     >
-                      応募者を見る（{(job.applicants || []).length}人）
+                      応募者を見る（{job.applicantCount || 0}人）
                     </Button>
                   }
                 />

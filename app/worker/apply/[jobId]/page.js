@@ -18,14 +18,21 @@ export default function ApplyPage({ params }) {
 
   const [form, setForm] = useState({ name: "", contact: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const update = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    await applyToJob(jobId, form);
-    router.push("/worker/complete");
+    setError("");
+    try {
+      await applyToJob(jobId, form);
+      router.push("/worker/complete");
+    } catch (err) {
+      setError(err.message || "応募に失敗しました。もう一度お試しください。");
+      setSubmitting(false);
+    }
   };
 
   if (!job) {
@@ -100,6 +107,10 @@ export default function ApplyPage({ params }) {
               onChange={update("message")}
             />
           </div>
+
+          {error && (
+            <p className="rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>
+          )}
 
           <Button type="submit" variant="primary" className="w-full" disabled={submitting}>
             {submitting ? "送信中…" : "この内容で応募する"}
