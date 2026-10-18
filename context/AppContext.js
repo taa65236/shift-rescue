@@ -16,7 +16,6 @@ const POLL_INTERVAL_MS = 4000;
 export function AppProvider({ children }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState(null); // "store" | "worker"（画面表示用のみ。認証ではない）
   const pollingRef = useRef(null);
 
   const refreshJobs = async () => {
@@ -66,8 +65,8 @@ export function AppProvider({ children }) {
   };
 
   const value = useMemo(
-    () => ({ jobs, loading, role, setRole, addJob, applyToJob, matchJob, getJob, getApplicantsForJob }),
-    [jobs, loading, role]
+    () => ({ jobs, loading, addJob, applyToJob, matchJob, getJob, getApplicantsForJob }),
+    [jobs, loading]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

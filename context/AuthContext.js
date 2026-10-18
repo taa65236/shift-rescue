@@ -4,12 +4,15 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { mapAuthError, signInWithEmail, signOutUser, signUpWithEmail } from "@/lib/auth";
+import { createUserProfile, getUserProfile } from "@/lib/firestoreRest";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [profileReady, setProfileReady] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
@@ -19,10 +22,49 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const signUp = async (email, password) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      if (!user) {
+        setProfile(null);
+        setProfileReady(true);
+        return;
+      }
+
+      setProfileReady(false);
+      try {
+        const nextProfile = await getUserProfile(user.uid);
+        if (!cancelled) {
+          setProfile(nextProfile);
+          setProfileReady(true);
+        }
+      } catch (error) {
+        console.error("プロフィールの取得に失敗しました:", error);
+        if (!cancelled) {
+          setProfile(null);
+          setProfileReady(true);
+        }
+      }
+    };
+
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const signUp = async (email, password, role) => {
     try {
-      await signUpWithEmail(email, password);
+      const credential = await signUpWithEmail(email, password);
+      const nextProfile = await createUserProfile(credential.user.uid, {
+        role,
+        email: credential.user.email,
+      });
+      setProfile(nextProfile);
+      setProfileReady(true);
     } catch (error) {
+      if (error.message && !error.code) throw error;
       throw new Error(mapAuthError(error));
     }
   };
@@ -35,13 +77,26 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const saveRole = async (role) => {
+    if (!user) throw new Error("ログインしてください。");
+    if (profile?.role) throw new Error("役割はすでに設定されています。");
+    const nextProfile = await createUserProfile(user.uid, {
+      role,
+      email: user.email,
+    });
+    setProfile(nextProfile);
+    setProfileReady(true);
+    return nextProfile;
+  };
+
   const logOut = async () => {
     await signOutUser();
+    setProfile(null);
   };
 
   const value = useMemo(
-    () => ({ user, authReady, signUp, signIn, logOut }),
-    [user, authReady]
+    () => ({ user, authReady, profile, profileReady, signUp, signIn, saveRole, logOut }),
+    [user, authReady, profile, profileReady]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

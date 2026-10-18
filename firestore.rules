@@ -7,5 +7,11 @@ service cloud.firestore {
     match /jobs/{jobId} {
       allow read, write: if true;
     }
+
+    // ステップ2：役割プロフィール用。認証トークンはまだ付けないため公開のままです。
+    // 最終的な制限は後のステップで行います。
+    match /users/{userId} {
+      allow read, write: if true;
+    }
   }
 }

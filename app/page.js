@@ -1,28 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-ink-900/15 bg-white px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-700/40 focus:border-flare-500 focus:outline-none focus:ring-2 focus:ring-flare-500/30";
 
+function dashboardPath(role) {
+  return role === "store" ? "/store/dashboard" : "/worker/dashboard";
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const { setRole } = useApp();
-  const { user, authReady, signIn, signUp, logOut } = useAuth();
+  const { user, authReady, profile, profileReady, signIn, signUp, saveRole, logOut } = useAuth();
 
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupRole, setSignupRole] = useState("store");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = (role) => {
-    setRole(role);
-    router.push(role === "store" ? "/store/dashboard" : "/worker/dashboard");
-  };
+  useEffect(() => {
+    if (!authReady || !profileReady) return;
+    if (user && profile?.role) {
+      router.replace(dashboardPath(profile.role));
+    }
+  }, [authReady, profileReady, user, profile, router]);
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -30,7 +35,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       if (mode === "signup") {
-        await signUp(email, password);
+        await signUp(email, password, signupRole);
       } else {
         await signIn(email, password);
       }
@@ -40,6 +45,22 @@ export default function LoginPage() {
       setSubmitting(false);
     }
   };
+
+  const handleSaveRole = async (role) => {
+    setError("");
+    setSubmitting(true);
+    try {
+      await saveRole(role);
+      router.replace(dashboardPath(role));
+    } catch (err) {
+      setError(err.message || "役割の保存に失敗しました。");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const ready = authReady && profileReady;
+  const needsRole = Boolean(user && !profile?.role);
 
   return (
     <main className="flex min-h-screen flex-col bg-ink-950">
@@ -60,9 +81,69 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-3 rounded-2xl bg-white p-6 shadow-card sm:p-8">
-            {!authReady ? (
+            {!ready || (user && profile?.role) ? (
               <p className="text-center text-sm text-ink-700/60">読み込み中です…</p>
-            ) : !user ? (
+            ) : needsRole ? (
+              <>
+                <p className="mb-1 text-center text-xs font-semibold uppercase tracking-wide text-ink-700/60">
+                  役割を選択してください
+                </p>
+                <p className="mb-4 text-center text-xs text-ink-700/70">{user.email}</p>
+                <p className="mb-4 text-center text-sm text-ink-700/70">
+                  一度選ぶと、このアカウントの役割は変わりません。
+                </p>
+
+                {error && (
+                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+                )}
+
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => handleSaveRole("store")}
+                  className="flex w-full items-center justify-between rounded-xl border border-ink-900/10 bg-ink-900 px-5 py-4 text-left transition hover:bg-ink-800 disabled:opacity-60"
+                >
+                  <span>
+                    <span className="block font-display text-base font-semibold text-white">
+                      店舗として登録
+                    </span>
+                    <span className="mt-0.5 block text-xs text-white/60">
+                      欠員募集の投稿・採用管理を行う
+                    </span>
+                  </span>
+                  <span aria-hidden className="text-xl text-flare-400">
+                    →
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => handleSaveRole("worker")}
+                  className="flex w-full items-center justify-between rounded-xl border border-ink-900/10 bg-white px-5 py-4 text-left transition hover:border-ink-900/25 disabled:opacity-60"
+                >
+                  <span>
+                    <span className="block font-display text-base font-semibold text-ink-900">
+                      ワーカーとして登録
+                    </span>
+                    <span className="mt-0.5 block text-xs text-ink-700/60">
+                      近くの募集を探して応募する
+                    </span>
+                  </span>
+                  <span aria-hidden className="text-xl text-flare-500">
+                    →
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={logOut}
+                  className="w-full text-center text-xs font-medium text-ink-700/50 hover:text-ink-900"
+                >
+                  ログアウト
+                </button>
+              </>
+            ) : (
               <>
                 <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-ink-700/60">
                   メールアドレスで{mode === "signup" ? "新規登録" : "ログイン"}
@@ -130,6 +211,39 @@ export default function LoginPage() {
                     />
                   </div>
 
+                  {mode === "signup" && (
+                    <div>
+                      <p className="mb-1.5 block text-sm font-semibold text-ink-900">役割</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSignupRole("store")}
+                          className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${
+                            signupRole === "store"
+                              ? "border-ink-900 bg-ink-900 text-white"
+                              : "border-ink-900/15 text-ink-700 hover:border-ink-900/30"
+                          }`}
+                        >
+                          店舗
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSignupRole("worker")}
+                          className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${
+                            signupRole === "worker"
+                              ? "border-ink-900 bg-ink-900 text-white"
+                              : "border-ink-900/15 text-ink-700 hover:border-ink-900/30"
+                          }`}
+                        >
+                          ワーカー
+                        </button>
+                      </div>
+                      <p className="mt-1.5 text-xs text-ink-700/60">
+                        登録後に役割は変更できません。
+                      </p>
+                    </div>
+                  )}
+
                   {error && (
                     <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
                   )}
@@ -142,65 +256,16 @@ export default function LoginPage() {
                     {submitting
                       ? "送信中…"
                       : mode === "signup"
-                        ? "登録する"
+                        ? "この役割で登録する"
                         : "ログインする"}
                   </button>
                 </form>
-              </>
-            ) : (
-              <>
-                <p className="mb-1 text-center text-xs font-semibold uppercase tracking-wide text-ink-700/60">
-                  ログイン方法を選択してください
-                </p>
-                <p className="mb-4 text-center text-xs text-ink-700/70">{user.email}</p>
-
-                <button
-                  onClick={() => handleLogin("store")}
-                  className="flex w-full items-center justify-between rounded-xl border border-ink-900/10 bg-ink-900 px-5 py-4 text-left transition hover:bg-ink-800"
-                >
-                  <span>
-                    <span className="block font-display text-base font-semibold text-white">
-                      店舗としてログイン
-                    </span>
-                    <span className="mt-0.5 block text-xs text-white/60">
-                      欠員募集の投稿・採用管理を行う
-                    </span>
-                  </span>
-                  <span aria-hidden className="text-xl text-flare-400">
-                    →
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => handleLogin("worker")}
-                  className="flex w-full items-center justify-between rounded-xl border border-ink-900/10 bg-white px-5 py-4 text-left transition hover:border-ink-900/25"
-                >
-                  <span>
-                    <span className="block font-display text-base font-semibold text-ink-900">
-                      ワーカーとしてログイン
-                    </span>
-                    <span className="mt-0.5 block text-xs text-ink-700/60">
-                      近くの募集を探して応募する
-                    </span>
-                  </span>
-                  <span aria-hidden className="text-xl text-flare-500">
-                    →
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={logOut}
-                  className="w-full text-center text-xs font-medium text-ink-700/50 hover:text-ink-900"
-                >
-                  ログアウト
-                </button>
               </>
             )}
           </div>
 
           <p className="mt-6 text-center text-xs text-white/30">
-            ※ メールアドレスで認証します。役割（店舗／ワーカー）はまだアカウントに保存されません。
+            ※ 役割はアカウントに保存されます。未ログインでは店舗・ワーカー画面を開けません。
           </p>
         </div>
       </div>
