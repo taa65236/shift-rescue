@@ -7,6 +7,7 @@ import Button from "@/components/Button";
 import JobCard from "@/components/JobCard";
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
+import { LINE_COMMUNITY_URL, shareJobToLine } from "@/lib/line";
 
 export default function StoreDashboardPage() {
   const { jobs, loading, closeJob } = useApp();
@@ -52,6 +53,25 @@ export default function StoreDashboardPage() {
           </Button>
         </div>
 
+        {LINE_COMMUNITY_URL && (
+          <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-rescue-400/50 bg-rescue-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-ink-800">
+              募集を出したら、「LINEで知らせる」で、学生のLINEグループにも共有できます。
+              先にオープンチャットに参加しておくと、すぐ送れます。
+            </p>
+            <Button
+              as="a"
+              href={LINE_COMMUNITY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="outline"
+              className="shrink-0"
+            >
+              LINEオープンチャットに参加
+            </Button>
+          </div>
+        )}
+
         {error && (
           <p className="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>
         )}
@@ -80,6 +100,14 @@ export default function StoreDashboardPage() {
                         className="w-full"
                       >
                         応募者を見る（{job.applicantCount || 0}人）
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => shareJobToLine(job)}
+                      >
+                        LINEで知らせる
                       </Button>
                       <Button
                         type="button"

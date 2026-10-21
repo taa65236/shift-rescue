@@ -6,6 +6,7 @@ import Button from "@/components/Button";
 import JobCard from "@/components/JobCard";
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
+import { LINE_COMMUNITY_URL } from "@/lib/line";
 
 export default function WorkerDashboardPage() {
   const { jobs, loading } = useApp();
@@ -24,6 +25,25 @@ export default function WorkerDashboardPage() {
         <p className="mt-1 text-sm text-ink-700/70">
           今すぐ応募できる欠員募集の一覧です。緊急の募集には信号マークが表示されます。
         </p>
+
+        {LINE_COMMUNITY_URL && (
+          <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-rescue-400/50 bg-rescue-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-ink-800">
+              新しい募集が出たら、LINEで知らせます。オープンチャットに参加しておくと、
+              急な募集を見逃しません。
+            </p>
+            <Button
+              as="a"
+              href={LINE_COMMUNITY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="success"
+              className="shrink-0"
+            >
+              LINEで通知を受け取る
+            </Button>
+          </div>
+        )}
 
         <div className="mt-8">
           {loading ? (
