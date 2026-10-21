@@ -5,11 +5,15 @@ import Header from "@/components/Header";
 import Button from "@/components/Button";
 import JobCard from "@/components/JobCard";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function WorkerDashboardPage() {
   const { jobs, loading } = useApp();
+  const { profile } = useAuth();
 
   const openJobs = jobs.filter((job) => job.status === "open");
+  // すでに応募した募集のID
+  const appliedIds = new Set(profile?.appliedJobIds || []);
 
   return (
     <main className="min-h-screen bg-slate-50 pb-16">
@@ -37,9 +41,20 @@ export default function WorkerDashboardPage() {
                   key={job.id}
                   job={job}
                   footer={
-                    <Button as={Link} href={`/worker/apply/${job.id}`} variant="primary" className="w-full">
-                      応募する
-                    </Button>
+                    appliedIds.has(job.id) ? (
+                      <Button variant="outline" className="w-full" disabled>
+                        応募済み（店舗からの連絡をお待ちください）
+                      </Button>
+                    ) : (
+                      <Button
+                        as={Link}
+                        href={`/worker/apply/${job.id}`}
+                        variant="primary"
+                        className="w-full"
+                      >
+                        応募する
+                      </Button>
+                    )
                   }
                 />
               ))}

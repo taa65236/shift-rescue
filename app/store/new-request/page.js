@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Button from "@/components/Button";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-ink-900/15 bg-white px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-700/40 focus:border-flare-500 focus:outline-none focus:ring-2 focus:ring-flare-500/30";
@@ -14,6 +15,7 @@ const LABEL_CLASS = "mb-1.5 block text-sm font-semibold text-ink-900";
 export default function NewRequestPage() {
   const router = useRouter();
   const { addJob } = useApp();
+  const { profile, refreshProfile } = useAuth();
 
   const [form, setForm] = useState({
     storeName: "",
@@ -25,21 +27,35 @@ export default function NewRequestPage() {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  // 前回の募集で使った店舗名を、最初から入れておく（まだ入力していないときだけ）
+  useEffect(() => {
+    if (!profile?.storeName) return;
+    setForm((prev) => ({ ...prev, storeName: prev.storeName || profile.storeName }));
+  }, [profile]);
 
   const update = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    await addJob({
-      storeName: form.storeName || "店舗名未設定",
-      position: form.position || "職種未設定",
-      workingHours: form.workingHours || "未設定",
-      hourlyWage: Number(form.hourlyWage) || 0,
-      location: form.location || "未設定",
-      description: form.description || "詳細は追ってお知らせします。",
-    });
-    router.push("/store/dashboard");
+    setError("");
+    try {
+      await addJob({
+        storeName: form.storeName || "店舗名未設定",
+        position: form.position || "職種未設定",
+        workingHours: form.workingHours || "未設定",
+        hourlyWage: Number(form.hourlyWage) || 0,
+        location: form.location || "未設定",
+        description: form.description || "詳細は追ってお知らせします。",
+      });
+      await refreshProfile();
+      router.push("/store/dashboard");
+    } catch (err) {
+      setError(err.message || "募集の作成に失敗しました。もう一度お試しください。");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -126,6 +142,10 @@ export default function NewRequestPage() {
               onChange={update("description")}
             />
           </div>
+
+          {error && (
+            <p className="rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>
+          )}
 
           <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
   listJobs,
@@ -8,12 +9,15 @@ import {
   createJob,
   applyToJobRemote,
   matchJobRemote,
+  getUserProfile,
+  updateUserFields,
 } from "@/lib/firestoreRest";
 
 const AppContext = createContext(null);
 
 // 何秒おきに最新の募集一覧を取りに行くか（ミリ秒）
-const POLL_INTERVAL_MS = 4000;
+// Firestoreの無料枠（1日の読み取り5万回）を使い切らないよう、間隔をあけている。
+const POLL_INTERVAL_MS = 10000;
 
 export function AppProvider({ children }) {
   const [jobs, setJobs] = useState([]);
@@ -21,37 +25,45 @@ export function AppProvider({ children }) {
   const [applicantsByJob, setApplicantsByJob] = useState({});
   const [loading, setLoading] = useState(true);
   const pollingRef = useRef(null);
+  // ログイン状態の確認が終わったかどうか（確認前に「募集なし」と出さないため）
+  const authSettledRef = useRef(false);
 
   const refreshJobs = async () => {
+    const uid = auth.currentUser?.uid;
+
+    // 未ログインのときは、データを取りに行かない
+    if (!uid) {
+      if (authSettledRef.current) {
+        setJobs((prev) => (prev.length ? [] : prev));
+        setApplicantsByJob((prev) => (Object.keys(prev).length ? {} : prev));
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       const latest = await listJobs();
       setJobs(latest);
 
       // 応募者は「自分（店舗）が出した募集」の分だけ取りに行く。
-      // 他の店舗の応募者は、ルール上も読めないようにする（ステップ6）。
-      const uid = auth.currentUser?.uid;
-      if (!uid) {
-        setApplicantsByJob((prev) => (Object.keys(prev).length ? {} : prev));
-      } else {
-        const myJobs = latest.filter((job) => job.ownerId === uid);
-        const entries = await Promise.all(
-          myJobs.map(async (job) => {
-            try {
-              return [job.id, await listApplicants(job.id)];
-            } catch (error) {
-              console.error("応募者の取得に失敗しました:", error);
-              return [job.id, null];
-            }
-          })
-        );
-        setApplicantsByJob((prev) => {
-          const next = {};
-          for (const [jobId, list] of entries) {
-            next[jobId] = list ?? prev[jobId] ?? [];
+      const myJobs = latest.filter((job) => job.ownerId === uid);
+      const entries = await Promise.all(
+        myJobs.map(async (job) => {
+          try {
+            return [job.id, await listApplicants(job.id)];
+          } catch (error) {
+            console.error("応募者の取得に失敗しました:", error);
+            return [job.id, null];
           }
-          return next;
-        });
-      }
+        })
+      );
+      setApplicantsByJob((prev) => {
+        const next = {};
+        for (const [jobId, list] of entries) {
+          next[jobId] = list ?? prev[jobId] ?? [];
+        }
+        return next;
+      });
     } catch (error) {
       console.error("募集一覧の取得に失敗しました:", error);
     } finally {
@@ -60,9 +72,28 @@ export function AppProvider({ children }) {
   };
 
   useEffect(() => {
-    refreshJobs();
-    pollingRef.current = setInterval(refreshJobs, POLL_INTERVAL_MS);
-    return () => clearInterval(pollingRef.current);
+    // ログイン・ログアウトしたら、すぐに取り直す
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      authSettledRef.current = true;
+      refreshJobs();
+    });
+
+    // 画面を開いているときだけ、定期的に取りに行く
+    pollingRef.current = setInterval(() => {
+      if (!document.hidden) refreshJobs();
+    }, POLL_INTERVAL_MS);
+
+    // 別のタブから戻ってきたときも、すぐに取り直す
+    const handleVisibility = () => {
+      if (!document.hidden) refreshJobs();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      unsubscribe();
+      clearInterval(pollingRef.current);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   // 欠員募集を新規作成する（作った人のuidを ownerId として保存）
@@ -70,6 +101,14 @@ export function AppProvider({ children }) {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error("ログインしてください。");
     const jobId = await createJob({ ...jobData, ownerId: uid });
+
+    // 次回の入力を楽にするため、店舗名をプロフィールに覚えておく（失敗しても募集は成立）
+    try {
+      await updateUserFields(uid, { storeName: jobData.storeName });
+    } catch (error) {
+      console.error("店舗名の保存に失敗しました:", error);
+    }
+
     await refreshJobs();
     return jobId;
   };
@@ -79,6 +118,22 @@ export function AppProvider({ children }) {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error("ログインしてください。");
     await applyToJobRemote(jobId, uid, applicantInfo);
+
+    // 「応募済み」の表示と、次回の入力補助のために、プロフィールに記録（失敗しても応募は成立）
+    try {
+      const profile = await getUserProfile(uid);
+      const appliedJobIds = Array.from(
+        new Set([...(profile?.appliedJobIds || []), jobId])
+      );
+      await updateUserFields(uid, {
+        appliedJobIds,
+        displayName: applicantInfo.name,
+        contact: applicantInfo.contact,
+      });
+    } catch (error) {
+      console.error("応募の記録に失敗しました:", error);
+    }
+
     await refreshJobs();
   };
 

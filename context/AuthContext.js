@@ -89,13 +89,34 @@ export function AuthProvider({ children }) {
     return nextProfile;
   };
 
+  // プロフィールを取り直す（応募済みの記録や、店舗名の保存のあとに使う）
+  const refreshProfile = async () => {
+    if (!user) return;
+    try {
+      const nextProfile = await getUserProfile(user.uid);
+      setProfile(nextProfile);
+    } catch (error) {
+      console.error("プロフィールの取得に失敗しました:", error);
+    }
+  };
+
   const logOut = async () => {
     await signOutUser();
     setProfile(null);
   };
 
   const value = useMemo(
-    () => ({ user, authReady, profile, profileReady, signUp, signIn, saveRole, logOut }),
+    () => ({
+      user,
+      authReady,
+      profile,
+      profileReady,
+      signUp,
+      signIn,
+      saveRole,
+      refreshProfile,
+      logOut,
+    }),
     [user, authReady, profile, profileReady]
   );
 

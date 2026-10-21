@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Button from "@/components/Button";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-ink-900/15 bg-white px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-700/40 focus:border-flare-500 focus:outline-none focus:ring-2 focus:ring-flare-500/30";
@@ -14,11 +15,24 @@ export default function ApplyPage({ params }) {
   const { jobId } = params;
   const router = useRouter();
   const { getJob, applyToJob } = useApp();
+  const { profile, refreshProfile } = useAuth();
   const job = getJob(jobId);
 
   const [form, setForm] = useState({ name: "", contact: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const alreadyApplied = (profile?.appliedJobIds || []).includes(jobId);
+
+  // 前回応募したときの名前と連絡先を、最初から入れておく（まだ何も入力していない項目だけ）
+  useEffect(() => {
+    if (!profile) return;
+    setForm((prev) => ({
+      ...prev,
+      name: prev.name || profile.displayName || "",
+      contact: prev.contact || profile.contact || "",
+    }));
+  }, [profile]);
 
   const update = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
@@ -28,6 +42,7 @@ export default function ApplyPage({ params }) {
     setError("");
     try {
       await applyToJob(jobId, form);
+      await refreshProfile();
       router.push("/worker/complete");
     } catch (err) {
       setError(err.message || "応募に失敗しました。もう一度お試しください。");
@@ -75,6 +90,12 @@ export default function ApplyPage({ params }) {
             IDなど、確実に連絡が取れるものを入力してください。
           </p>
 
+          {alreadyApplied && (
+            <p className="rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+              この募集には、すでに応募しています。店舗からの連絡をお待ちください。
+            </p>
+          )}
+
           <div>
             <label className={LABEL_CLASS}>お名前</label>
             <input
@@ -112,8 +133,13 @@ export default function ApplyPage({ params }) {
             <p className="rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>
           )}
 
-          <Button type="submit" variant="primary" className="w-full" disabled={submitting}>
-            {submitting ? "送信中…" : "この内容で応募する"}
+          <Button
+            type="submit"
+            variant="primary"
+            className="w-full"
+            disabled={submitting || alreadyApplied}
+          >
+            {alreadyApplied ? "応募済みです" : submitting ? "送信中…" : "この内容で応募する"}
           </Button>
         </form>
       </div>
