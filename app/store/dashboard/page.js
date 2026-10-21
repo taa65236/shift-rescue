@@ -9,14 +9,29 @@ import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 
 export default function StoreDashboardPage() {
-  const { jobs, loading } = useApp();
+  const { jobs, loading, closeJob } = useApp();
   const { user } = useAuth();
   const [showMatched, setShowMatched] = useState(false);
+  const [error, setError] = useState("");
 
   // 自分（ログイン中の店舗）が出した募集だけを表示する
   const myJobs = jobs.filter((job) => user && job.ownerId === user.uid);
-  const openJobs = myJobs.filter((job) => job.status !== "matched");
+  // 取り消した募集（closed）は、一覧に出さない
+  const openJobs = myJobs.filter((job) => job.status === "open");
   const matchedJobs = myJobs.filter((job) => job.status === "matched");
+
+  const handleClose = async (job) => {
+    const ok = window.confirm(
+      `「${job.position}」の募集を取り消しますか？\nワーカーの一覧から消え、応募できなくなります。`
+    );
+    if (!ok) return;
+    setError("");
+    try {
+      await closeJob(job.id);
+    } catch (err) {
+      setError(err.message || "募集の取り消しに失敗しました。もう一度お試しください。");
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 pb-16">
@@ -37,6 +52,10 @@ export default function StoreDashboardPage() {
           </Button>
         </div>
 
+        {error && (
+          <p className="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>
+        )}
+
         <div className="mt-8">
           {loading ? (
             <div className="rounded-2xl border border-dashed border-ink-900/15 bg-white p-10 text-center text-sm text-ink-700/60">
@@ -53,14 +72,24 @@ export default function StoreDashboardPage() {
                   key={job.id}
                   job={job}
                   footer={
-                    <Button
-                      as={Link}
-                      href={`/store/applicants/${job.id}`}
-                      variant="secondary"
-                      className="w-full"
-                    >
-                      応募者を見る（{job.applicantCount || 0}人）
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        as={Link}
+                        href={`/store/applicants/${job.id}`}
+                        variant="secondary"
+                        className="w-full"
+                      >
+                        応募者を見る（{job.applicantCount || 0}人）
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full"
+                        onClick={() => handleClose(job)}
+                      >
+                        この募集を取り消す
+                      </Button>
+                    </div>
                   }
                 />
               ))}

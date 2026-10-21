@@ -9,6 +9,7 @@ import {
   createJob,
   applyToJobRemote,
   matchJobRemote,
+  closeJobRemote,
   getUserProfile,
   updateUserFields,
 } from "@/lib/firestoreRest";
@@ -143,6 +144,12 @@ export function AppProvider({ children }) {
     await refreshJobs();
   };
 
+  // 店舗が募集を取り消す（ワーカーの一覧から消え、応募できなくなる）
+  const closeJob = async (jobId) => {
+    await closeJobRemote(jobId);
+    await refreshJobs();
+  };
+
   // 募集に「応募人数（applicantCount）」を付けた一覧。
   // 数えられるのは自分が出した募集だけ（他店の応募者は読めないため）。
   const jobsWithCount = useMemo(
@@ -169,6 +176,7 @@ export function AppProvider({ children }) {
       addJob,
       applyToJob,
       matchJob,
+      closeJob,
       getJob,
       getApplicantsForJob,
     }),
