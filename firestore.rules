@@ -1,17 +1,44 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // パイロットテスト用の設定です。
-    // 誰でも jobs コレクションを読み書きできるようにしています（認証なし）。
-    // 一般公開・長期運用する場合は、投稿頻度の制限や簡易認証の追加を検討してください。
-    match /jobs/{jobId} {
-      allow read, write: if true;
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function roleOf(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
     }
 
-    // ステップ2：役割プロフィール用。認証トークンはまだ付けないため公開のままです。
-    // 最終的な制限は後のステップで行います。
     match /users/{userId} {
-      allow read, write: if true;
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn() && request.auth.uid == userId
+        && request.resource.data.role in ['store', 'worker'];
+      allow update: if signedIn() && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role;
+      allow delete: if false;
+    }
+
+    match /jobs/{jobId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && roleOf(request.auth.uid) == 'store'
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      match /applicants/{applicantId} {
+        allow read: if signedIn()
+          && (request.auth.uid == applicantId
+              || get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerId == request.auth.uid);
+        allow create: if signedIn()
+          && request.auth.uid == applicantId
+          && roleOf(request.auth.uid) == 'worker'
+          && request.resource.data.workerId == request.auth.uid
+          && get(/databases/$(database)/documents/jobs/$(jobId)).data.status == 'open';
+        allow update, delete: if false;
+      }
     }
   }
 }
