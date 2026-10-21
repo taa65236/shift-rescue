@@ -1,19 +1,34 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Button from "@/components/Button";
 import Badge from "@/components/Badge";
 import ApplicantCard from "@/components/ApplicantCard";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ApplicantsPage({ params }) {
   const { jobId } = params;
   const router = useRouter();
-  const { getJob, getApplicantsForJob, matchJob } = useApp();
+  const { getJob, getApplicantsForJob, matchJob, loading } = useApp();
+  const { user } = useAuth();
+  const [error, setError] = useState("");
 
   const job = getJob(jobId);
   const applicants = getApplicantsForJob(jobId);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <Header roleLabel="店舗モード" />
+        <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-ink-700/60">
+          読み込み中です…
+        </div>
+      </main>
+    );
+  }
 
   if (!job) {
     return (
@@ -26,9 +41,34 @@ export default function ApplicantsPage({ params }) {
     );
   }
 
+  // 自分が出した募集でなければ、応募者の情報は見せない
+  if (!user || job.ownerId !== user.uid) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <Header roleLabel="店舗モード" />
+        <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-ink-700/60">
+          この募集の応募者を見る権限がありません。
+          <div className="mt-4">
+            <button
+              onClick={() => router.push("/store/dashboard")}
+              className="font-medium text-ink-700 underline hover:text-ink-900"
+            >
+              ダッシュボードに戻る
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const handleHire = async (applicantId) => {
-    await matchJob(job.id, applicantId);
-    router.push(`/store/matched/${job.id}`);
+    setError("");
+    try {
+      await matchJob(job.id, applicantId);
+      router.push(`/store/matched/${job.id}`);
+    } catch (err) {
+      setError(err.message || "採用の処理に失敗しました。もう一度お試しください。");
+    }
   };
 
   return (
@@ -67,6 +107,10 @@ export default function ApplicantsPage({ params }) {
         <h2 className="mb-3 mt-8 font-display text-lg font-semibold text-ink-900">
           応募者一覧（{applicants.length}人）
         </h2>
+
+        {error && (
+          <p className="mb-3 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>
+        )}
 
         {applicants.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-ink-900/15 bg-white p-10 text-center text-sm text-ink-700/60">

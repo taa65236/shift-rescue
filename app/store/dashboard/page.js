@@ -6,13 +6,17 @@ import Header from "@/components/Header";
 import Button from "@/components/Button";
 import JobCard from "@/components/JobCard";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function StoreDashboardPage() {
   const { jobs, loading } = useApp();
+  const { user } = useAuth();
   const [showMatched, setShowMatched] = useState(false);
 
-  const openJobs = jobs.filter((job) => job.status !== "matched");
-  const matchedJobs = jobs.filter((job) => job.status === "matched");
+  // 自分（ログイン中の店舗）が出した募集だけを表示する
+  const myJobs = jobs.filter((job) => user && job.ownerId === user.uid);
+  const openJobs = myJobs.filter((job) => job.status !== "matched");
+  const matchedJobs = myJobs.filter((job) => job.status === "matched");
 
   return (
     <main className="min-h-screen bg-slate-50 pb-16">
