@@ -115,10 +115,11 @@ export function AppProvider({ children }) {
   };
 
   // ワーカーが募集に応募する（名前・連絡先・一言メッセージを登録）
-  const applyToJob = async (jobId, applicantInfo) => {
+  // 店舗はワーカーのプロフィールを読めないので、飲食経験は応募データに書き写す
+  const applyToJob = async (jobId, applicantInfo, foodExperience = null) => {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error("ログインしてください。");
-    await applyToJobRemote(jobId, uid, applicantInfo);
+    await applyToJobRemote(jobId, uid, { ...applicantInfo, foodExperience });
 
     // 「応募済み」の表示と、次回の入力補助のために、プロフィールに記録（失敗しても応募は成立）
     try {

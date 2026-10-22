@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { toFoodExperience } from "@/lib/foodExperience";
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-ink-900/15 bg-white px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-700/40 focus:border-flare-500 focus:outline-none focus:ring-2 focus:ring-flare-500/30";
@@ -29,6 +30,10 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [signupRole, setSignupRole] = useState("store");
+  // 飲食経験（ワーカーの新規登録のときだけ使う）。hasExperience は null=未選択
+  const [hasExperience, setHasExperience] = useState(null);
+  const [expHall, setExpHall] = useState(false);
+  const [expKitchen, setExpKitchen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -43,10 +48,24 @@ export default function LoginPage() {
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    let foodExperience = null;
+    if (mode === "signup" && signupRole === "worker") {
+      if (hasExperience === null) {
+        setError("飲食店での経験の「あり」か「なし」を選んでください。");
+        return;
+      }
+      foodExperience = toFoodExperience({ hasExperience, hall: expHall, kitchen: expKitchen });
+      if (!foodExperience) {
+        setError("経験がある仕事（接客・調理）を1つ以上選んでください。");
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       if (mode === "signup") {
-        await signUp(email, password, signupRole);
+        await signUp(email, password, signupRole, foodExperience);
       } else {
         await signIn(email, password);
       }
@@ -320,6 +339,64 @@ export default function LoginPage() {
                       </div>
                       <p className="mt-1.5 text-xs text-ink-700/60">
                         登録後に役割は変更できません。
+                      </p>
+                    </div>
+                  )}
+
+                  {mode === "signup" && signupRole === "worker" && (
+                    <div>
+                      <p className="mb-1.5 block text-sm font-semibold text-ink-900">
+                        飲食店での経験
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: true, label: "あり" },
+                          { value: false, label: "なし" },
+                        ].map((option) => (
+                          <button
+                            key={option.label}
+                            type="button"
+                            onClick={() => setHasExperience(option.value)}
+                            className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${
+                              hasExperience === option.value
+                                ? "border-ink-900 bg-ink-900 text-white"
+                                : "border-ink-900/15 text-ink-700 hover:border-ink-900/30"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {hasExperience && (
+                        <div className="mt-3">
+                          <p className="mb-1.5 text-xs font-semibold text-ink-700">
+                            経験がある仕事（複数選べます）
+                          </p>
+                          <div className="flex flex-wrap gap-4">
+                            <label className="flex items-center gap-2 text-sm text-ink-900">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-flare-500"
+                                checked={expHall}
+                                onChange={(e) => setExpHall(e.target.checked)}
+                              />
+                              接客（ホール）
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-ink-900">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-flare-500"
+                                checked={expKitchen}
+                                onChange={(e) => setExpKitchen(e.target.checked)}
+                              />
+                              調理（キッチン）
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                      <p className="mt-1.5 text-xs text-ink-700/60">
+                        くわしい経験は、募集に応募するときに書けます。
                       </p>
                     </div>
                   )}

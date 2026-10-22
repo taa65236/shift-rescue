@@ -60,12 +60,13 @@ export function AuthProvider({ children }) {
     };
   }, [user]);
 
-  const signUp = async (email, password, role) => {
+  const signUp = async (email, password, role, foodExperience = null) => {
     try {
       const credential = await signUpWithEmail(email, password);
       const nextProfile = await createUserProfile(credential.user.uid, {
         role,
         email: credential.user.email,
+        foodExperience,
       });
       setProfile(nextProfile);
       setProfileReady(true);

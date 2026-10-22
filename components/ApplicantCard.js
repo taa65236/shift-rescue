@@ -1,6 +1,8 @@
 "use client";
 
+import Badge from "@/components/Badge";
 import Button from "@/components/Button";
+import { foodExperienceLabel } from "@/lib/foodExperience";
 import { formatRelativeTime } from "@/lib/time";
 
 export default function ApplicantCard({ applicant, isMatched, onHire }) {
@@ -16,7 +18,8 @@ export default function ApplicantCard({ applicant, isMatched, onHire }) {
         </div>
         <div>
           <p className="font-display text-base font-semibold text-ink-900">{applicant.name}</p>
-          <p className="mt-0.5 text-sm text-ink-700/80">連絡先：{applicant.contact}</p>
+          <Badge className="mt-1">飲食経験：{foodExperienceLabel(applicant.foodExperience)}</Badge>
+          <p className="mt-1 text-sm text-ink-700/80">連絡先：{applicant.contact}</p>
           {applicant.message && (
             <p className="mt-1 max-w-sm text-sm text-ink-700/70">「{applicant.message}」</p>
           )}

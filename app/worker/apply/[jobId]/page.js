@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import Button from "@/components/Button";
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
+import { foodExperienceLabel } from "@/lib/foodExperience";
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-ink-900/15 bg-white px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-700/40 focus:border-flare-500 focus:outline-none focus:ring-2 focus:ring-flare-500/30";
@@ -41,7 +42,7 @@ export default function ApplyPage({ params }) {
     setSubmitting(true);
     setError("");
     try {
-      await applyToJob(jobId, form);
+      await applyToJob(jobId, form, profile?.foodExperience || null);
       await refreshProfile();
       router.push("/worker/complete");
     } catch (err) {
@@ -95,6 +96,14 @@ export default function ApplyPage({ params }) {
               この募集には、すでに応募しています。店舗からの連絡をお待ちください。
             </p>
           )}
+
+          <div className="rounded-xl bg-ink-900/5 px-4 py-2.5 text-sm text-ink-800">
+            登録した飲食経験：
+            <span className="font-semibold">{foodExperienceLabel(profile?.foodExperience)}</span>
+            <span className="mt-0.5 block text-xs text-ink-700/60">
+              経験の年数や内容は、下の「一言メッセージ」に書いてください。
+            </span>
+          </div>
 
           <div>
             <label className={LABEL_CLASS}>お名前</label>
