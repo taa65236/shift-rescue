@@ -3,7 +3,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { mapAuthError, signInWithEmail, signOutUser, signUpWithEmail } from "@/lib/auth";
+import {
+  mapAuthError,
+  sendPasswordReset,
+  signInWithEmail,
+  signOutUser,
+  signUpWithEmail,
+} from "@/lib/auth";
 import { createUserProfile, getUserProfile } from "@/lib/firestoreRest";
 
 const AuthContext = createContext(null);
@@ -77,6 +83,14 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const resetPassword = async (email) => {
+    try {
+      await sendPasswordReset(email);
+    } catch (error) {
+      throw new Error(mapAuthError(error));
+    }
+  };
+
   const saveRole = async (role) => {
     if (!user) throw new Error("ログインしてください。");
     if (profile?.role) throw new Error("役割はすでに設定されています。");
@@ -113,6 +127,7 @@ export function AuthProvider({ children }) {
       profileReady,
       signUp,
       signIn,
+      resetPassword,
       saveRole,
       refreshProfile,
       logOut,

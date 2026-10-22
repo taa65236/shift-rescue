@@ -13,7 +13,17 @@ function dashboardPath(role) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, authReady, profile, profileReady, signIn, signUp, saveRole, logOut } = useAuth();
+  const {
+    user,
+    authReady,
+    profile,
+    profileReady,
+    signIn,
+    signUp,
+    resetPassword,
+    saveRole,
+    logOut,
+  } = useAuth();
 
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -21,6 +31,7 @@ export default function LoginPage() {
   const [signupRole, setSignupRole] = useState("store");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     if (!authReady || !profileReady) return;
@@ -44,6 +55,30 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // 未登録のアドレスでも成功扱いになる（Firebase のメールアドレス列挙保護）ので、文言はぼかす
+  const handleResetSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setNotice("");
+    setSubmitting(true);
+    try {
+      await resetPassword(email);
+      setNotice(
+        "入力したメールアドレスが登録されていれば、パスワード再設定メールを送りました。メールのリンクから新しいパスワードを設定してください。"
+      );
+    } catch (err) {
+      setError(err.message || "再設定メールの送信に失敗しました。");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const switchMode = (nextMode) => {
+    setMode(nextMode);
+    setError("");
+    setNotice("");
   };
 
   const handleSaveRole = async (role) => {
@@ -143,6 +178,57 @@ export default function LoginPage() {
                   ログアウト
                 </button>
               </>
+            ) : mode === "reset" ? (
+              <>
+                <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-ink-700/60">
+                  パスワード再設定
+                </p>
+                <p className="mb-4 text-center text-sm text-ink-700/70">
+                  登録したメールアドレスを入力すると、再設定用のリンクをお送りします。
+                </p>
+
+                <form onSubmit={handleResetSubmit} className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-ink-900">
+                      メールアドレス
+                    </label>
+                    <input
+                      required
+                      type="email"
+                      autoComplete="email"
+                      className={FIELD_CLASS}
+                      placeholder="例：store@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+
+                  {error && (
+                    <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+                  )}
+                  {notice && (
+                    <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+                      {notice}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex w-full items-center justify-center rounded-xl bg-ink-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink-800 disabled:opacity-60"
+                  >
+                    {submitting ? "送信中…" : "再設定メールを送る"}
+                  </button>
+                </form>
+
+                <button
+                  type="button"
+                  onClick={() => switchMode("login")}
+                  className="w-full text-center text-xs font-medium text-ink-700/50 hover:text-ink-900"
+                >
+                  ログインに戻る
+                </button>
+              </>
             ) : (
               <>
                 <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-ink-700/60">
@@ -152,10 +238,7 @@ export default function LoginPage() {
                 <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-ink-900/5 p-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode("login");
-                      setError("");
-                    }}
+                    onClick={() => switchMode("login")}
                     className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
                       mode === "login"
                         ? "bg-white text-ink-900 shadow-sm"
@@ -166,10 +249,7 @@ export default function LoginPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode("signup");
-                      setError("");
-                    }}
+                    onClick={() => switchMode("signup")}
                     className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
                       mode === "signup"
                         ? "bg-white text-ink-900 shadow-sm"
@@ -260,6 +340,16 @@ export default function LoginPage() {
                         : "ログインする"}
                   </button>
                 </form>
+
+                {mode === "login" && (
+                  <button
+                    type="button"
+                    onClick={() => switchMode("reset")}
+                    className="w-full text-center text-xs font-medium text-ink-700/50 hover:text-ink-900"
+                  >
+                    パスワードを忘れた方
+                  </button>
+                )}
               </>
             )}
           </div>
